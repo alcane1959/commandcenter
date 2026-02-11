@@ -83,6 +83,7 @@
         <button onclick="switchTab('agua')" id="tab-agua" class="nav-item" data-title="Água">💧</button>
         <button onclick="switchTab('gas')" id="tab-gas" class="nav-item" data-title="Gás">🔥</button>
         <button onclick="switchTab('saude')" id="tab-saude" class="nav-item" data-title="Assist. Médica">🏥</button>
+        <button onclick="switchTab('cartao')" id="tab-cartao" class="nav-item" data-title="Cartão de Crédito">💳</button>
         
         <div style="margin-top: auto; padding-bottom: 10px; display: flex; flex-direction: column; gap: 10px; align-items: center; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 20px; width: 100%;">
             <button class="side-btn" onclick="exportarDados()" data-title="Exportar Backup">📤</button>
@@ -101,12 +102,13 @@
             luz: { label: "Luz", icon: "💡", fields: ["Identificação", "Cidade", "Instalação", "Link"] },
             agua: { label: "Água", icon: "💧", fields: ["Identificação", "Cidade", "RGI", "Link"] },
             gas: { label: "Gás", icon: "🔥", fields: ["Identificação", "Cidade", "Código", "Link"] },
-            saude: { label: "Assistência Médica", icon: "🏥", fields: ["Plano", "Operadora", "Matrícula", "Link"] }
+            saude: { label: "Assistência Médica", icon: "🏥", fields: ["Plano", "Operadora", "Matrícula", "Link"] },
+            cartao: { label: "Cartão de Crédito", icon: "💳", fields: ["Cartão", "Banco", "Final", "Link"] }
         };
 
-        let data = JSON.parse(localStorage.getItem('asset_pro_master_data')) || {
-            imoveis: [], matriculas: [], condominios: [], luz: [], agua: [], gas: [], saude: []
-        };
+        // Inicia dados garantindo que a chave 'cartao' exista
+        let data = JSON.parse(localStorage.getItem('asset_pro_master_data')) || {};
+        Object.keys(categoryConfig).forEach(cat => { if(!data[cat]) data[cat] = []; });
 
         let editIdx = { type: null, index: null };
 
@@ -168,9 +170,9 @@
                     </tr>`;
                 } else {
                     body.innerHTML += `<tr>
-                        <td>${isSync ? '<span class="sync-icon">🔄</span>' : ''}<strong>${item.nome}</strong></td>
-                        <td>${item.cidade}</td>
-                        <td><code>${item.insc}</code> <button class="copy-btn" onclick="copiar('${item.insc}', this)">Copiar</button></td>
+                        <td>${isSync ? '<span class="sync-icon">🔄</span>' : ''}<strong>${item.nome || ''}</strong></td>
+                        <td>${item.cidade || ''}</td>
+                        <td><code>${item.insc || ''}</code> <button class="copy-btn" onclick="copiar('${item.insc}', this)">Copiar</button></td>
                         <td><a href="${item.link || '#'}" target="_blank" class="action-btn">${item.link ? 'Portal' : '-'}</a></td>
                         <td>
                             <button class="btn-insert" onclick="insertRow('${type}', ${index})">Inserir ↓</button>
@@ -207,16 +209,28 @@
         }
 
         function addItem(type) {
-            const f1 = document.getElementById(type + 'F1').value;
-            if (!f1) return;
-            const newItem = { id: Date.now(), nome: f1, cidade: document.getElementById(type + 'F2').value, insc: document.getElementById(type + 'F3').value, link: document.getElementById(type + 'F4').value };
+            const f1Val = document.getElementById(type + 'F1').value;
+            if (!f1Val) return;
+            const newItem = { 
+                id: Date.now(), 
+                nome: f1Val, 
+                cidade: document.getElementById(type + 'F2').value, 
+                insc: document.getElementById(type + 'F3').value, 
+                link: document.getElementById(type + 'F4').value 
+            };
             data[type].push(newItem);
+            
             if (type === 'imoveis' || type === 'matriculas') {
                 const other = (type === 'imoveis') ? 'matriculas' : 'imoveis';
                 data[other].push({ ...newItem, insc: "", link: "" });
             }
+            
             render();
-            ['F1', 'F2', 'F3', 'F4'].forEach(f => document.getElementById(type + f).value = '');
+            // Limpa os campos
+            ['F1', 'F2', 'F3', 'F4'].forEach(f => {
+                const el = document.getElementById(type + f);
+                if(el) el.value = '';
+            });
         }
 
         function insertRow(type, index) {
@@ -251,13 +265,7 @@
 
         function exportarDados() {
             const agora = new Date();
-            const dia = String(agora.getDate()).padStart(2, '0');
-            const mes = String(agora.getMonth() + 1).padStart(2, '0');
-            const ano = agora.getFullYear();
-            const horas = String(agora.getHours()).padStart(2, '0');
-            const minutos = String(agora.getMinutes()).padStart(2, '0');
-            const segundos = String(agora.getSeconds()).padStart(2, '0');
-            const timestamp = `${dia}-${mes}-${ano}_${horas}-${minutos}-${segundos}`;
+            const timestamp = agora.toISOString().replace(/[:.]/g, '-');
             const nomeArquivo = `backup_patrimonio_${timestamp}.json`;
             const blob = new Blob([JSON.stringify(data)], {type: "application/json"});
             const url = URL.createObjectURL(blob);
@@ -270,7 +278,17 @@
 
         function importarDados(e) {
             const reader = new FileReader();
-            reader.onload = (ev) => { try { data = JSON.parse(ev.target.result); render(); } catch(err) { alert("Erro."); } };
+            reader.onload = (ev) => { 
+                try { 
+                    const imported = JSON.parse(ev.target.result);
+                    // Garante que novas categorias existam no objeto importado
+                    Object.keys(categoryConfig).forEach(cat => {
+                        if(!imported[cat]) imported[cat] = [];
+                    });
+                    data = imported;
+                    render(); 
+                } catch(err) { alert("Erro ao importar."); } 
+            };
             reader.readAsText(e.target.files[0]);
         }
 
