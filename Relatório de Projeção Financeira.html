@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Relatório de Projeção Financeira</title>
+    <style>
+        :root { --primary: #2c3e50; --accent: #27ae60; --bg: #f4f7f6; }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); padding: 20px; color: #333; }
+        .container { max-width: 1200px; margin: auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        .grid-inputs { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; margin-bottom: 20px; }
+        .input-group { display: flex; flex-direction: column; }
+        label { font-weight: bold; margin-bottom: 5px; font-size: 0.8rem; }
+        input { padding: 12px; border: 1px solid #ccc; border-radius: 6px; font-size: 1rem; }
+        .buttons { display: flex; gap: 10px; margin: 25px 0; }
+        button { flex: 1; padding: 15px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; transition: 0.3s; text-transform: uppercase; }
+        .btn-calc { background: var(--accent); color: white; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { padding: 12px; border: 1px solid #ddd; text-align: center; font-size: 0.85rem; }
+        th { background: #2c3e50; color: white; }
+        .section-box { background: #fff; padding: 15px; border: 1px solid #eee; border-radius: 8px; margin-bottom: 20px; }
+        .melhor-opcao { background: #e8f5e9 !important; font-weight: bold; border: 2px solid #2e7d32 !important; }
+        .premissas-container { background: #f8f9fa; border: 2px solid #2c3e50; border-radius: 8px; padding: 20px; margin-bottom: 20px; }
+        .premissas-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 15px; }
+        .premissa-item { font-size: 0.95rem; border-bottom: 1px solid #dee2e6; padding: 5px 0; display: flex; justify-content: space-between; }
+        @media print { .buttons, .grid-inputs { display: none; } }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1 style="text-align:center; color: var(--primary);">Relatório de Projeção Financeira</h1>
+
+    <div class="grid-inputs">
+        <div class="input-group"><label>Investimento Inicial (R$)</label><input type="number" id="inicial" placeholder="0"></div>
+        <div class="input-group"><label>Aporte Mensal (R$)</label><input type="number" id="mensal" placeholder="0"></div>
+        <div class="input-group"><label>Prazo (Meses)</label><input type="number" id="meses" placeholder="0"></div>
+        <div class="input-group"><label>Saque Mensal (R$)</label><input type="number" id="saqueM" placeholder="0"></div>
+        <div class="input-group"><label>Saque Anual (R$)</label><input type="number" id="saqueA" placeholder="0"></div>
+    </div>
+
+    <div class="buttons">
+        <button class="btn-calc" onclick="calcular()">Calcular e Gerar Relatório</button>
+        <button style="background:#e67e22; color:white" onclick="limpar()">Limpar Cálculo</button>
+        <button style="background:#3498db; color:white" onclick="window.print()">Imprimir PDF</button>
+    </div>
+
+    <div id="resultado" style="display:none">
+        <div class="premissas-container">
+            <h3>Parâmetros do Investimento</h3>
+            <div class="premissas-grid" id="quadro-premissas"></div>
+        </div>
+
+        <div class="section-box">
+            <h3>1. Equivalência de Taxas Mensais (Juros Compostos) [cite: 9, 10]</h3>
+            <table>
+                <thead>
+                    <tr><th>Aplicação</th><th>Taxa Anual (Ref.)</th><th>Taxa Mensal Real</th><th>Rendimento Bruto Gerado</th></tr>
+                </thead>
+                <tbody id="corpo-taxas"></tbody>
+            </table>
+        </div>
+
+        <div class="section-box">
+            <h3>2. Detalhamento de Saques e Impostos [cite: 11, 12]</h3>
+            <table>
+                <thead>
+                    <tr><th>Aplicação</th><th>Saque Bruto Total</th><th>IR Total Pago (Sobre Lucro)</th><th>Saque Líquido Total</th><th>Saldo Final Líquido</th></tr>
+                </thead>
+                <tbody id="corpo-tabela"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+    const formatar = (v) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+    function limpar() {
+        document.querySelectorAll('input').forEach(input => input.value = '');
+        document.getElementById('resultado').style.display = 'none';
+    }
+
+    function calcular() {
+        const p = parseFloat(document.getElementById('inicial').value) || 0;
+        const m = parseFloat(document.getElementById('mensal').value) || 0;
+        const t = parseInt(document.getElementById('meses').value) || 0;
+        const sM = parseFloat(document.getElementById('saqueM').value) || 0;
+        const sA = parseFloat(document.getElementById('saqueA').value) || 0;
+
+        if (t <= 0) { alert("Informe o prazo em meses."); return; }
+
+        document.getElementById('quadro-premissas').innerHTML = `
+            <div class="premissa-item">Investimento Inicial: <b>${formatar(p)}</b></div>
+            <div class="premissa-item">Aporte Mensal: <b>${formatar(m)}</b></div>
+            <div class="premissa-item">Prazo: <b>${t} meses</b></div>
+            <div class="premissa-item">Capital Injetado: <b>${formatar(p + (m * t))}</b></div>
+        `;
+
+        let irReg = t <= 6 ? 0.225 : t <= 12 ? 0.20 : t <= 24 ? 0.175 : 0.15;
+        const opcoes = [
+            { nome: "Poupança", taxa: 0.0617, ir: 0 },
+            { nome: "Tesouro SELIC", taxa: 0.1125, ir: irReg },
+            { nome: "CDB (102% CDI)", taxa: 0.1137, ir: irReg },
+            { nome: "LCI/LCA", taxa: 0.095, ir: 0 },
+            { nome: "Previdência (Reg.)", taxa: 0.105, ir: 0.10 }
+        ];
+
+        let htmlRes = '', htmlTaxas = '', maiorFinal = -Infinity;
+
+        opcoes.forEach(opt => {
+            let saldoTotal = p, custoBase = p, rendBruto = 0, totSaqueB = 0, totIR = 0, totSaqueL = 0;
+            let iM = Math.pow(1 + opt.taxa, 1/12) - 1;
+
+            for (let mes = 1; mes <= t; mes++) {
+                let rend = saldoTotal * iM;
+                rendBruto += rend;
+                saldoTotal += rend;
+
+                const procSaque = (val) => {
+                    if (val <= 0 || saldoTotal <= 0) return;
+                    let sEfetivo = Math.min(val, saldoTotal);
+                    let lucroNoSaldo = Math.max(0, saldoTotal - custoBase);
+                    let propLucro = saldoTotal > 0 ? lucroNoSaldo / saldoTotal : 0;
+                    
+                    let baseIR = sEfetivo * propLucro;
+                    let imp = baseIR * opt.ir;
+
+                    totSaqueB += sEfetivo; totIR += imp; totSaqueL += (sEfetivo - imp);
+                    saldoTotal -= sEfetivo;
+                    if (sEfetivo > lucroNoSaldo) custoBase -= (sEfetivo - lucroNoSaldo);
+                };
+
+                procSaque(sM);
+                if (mes % 12 === 0) procSaque(sA);
+                saldoTotal += m; custoBase += m;
+            }
+
+            let lucroF = Math.max(0, saldoTotal - custoBase);
+            let irF = lucroF * opt.ir;
+            totIR += irF;
+            let saldoFinalL = saldoTotal - irF;
+
+            if (saldoFinalL > maiorFinal) maiorFinal = saldoFinalL;
+
+            htmlTaxas += `<tr><td>${opt.nome}</td><td>${(opt.taxa*100).toFixed(2)}%</td><td>${(iM*100).toFixed(4)}%</td><td>${formatar(rendBruto)}</td></tr>`;
+            htmlRes += `<tr ${saldoFinalL === maiorFinal ? 'class="melhor-opcao"' : ''}>
+                <td>${opt.nome}</td><td>${formatar(totSaqueB)}</td><td style="color:#c0392b">-${formatar(totIR)}</td><td>${formatar(totSaqueL)}</td><td><b>${formatar(saldoFinalL)}</b></td>
+            </tr>`;
+        });
+
+        document.getElementById('corpo-taxas').innerHTML = htmlTaxas;
+        document.getElementById('corpo-tabela').innerHTML = htmlRes;
+        document.getElementById('resultado').style.display = 'block';
+    }
+</script>
+</body>
+</html>
